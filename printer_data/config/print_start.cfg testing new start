@@ -1,29 +1,39 @@
-# --- at the top of PRINT_START params ---
-{% set bedtemp    = params.BED|default(60)|int %}
-{% set hotendtemp = params.HOTEND|default(210)|int %}
-{% set tol        = params.TOL|default(5)|int %}      # ±°C tolerance window
-{% set min_extrude = printer.configfile.settings.extruder.min_extrude_temp|default(170)|int %}
+#==============================================================================
+# Print Start G-code (tolerant hotend wait)
+# Usage: PRINT_START BED=60 HOTEND=250 [TOL_BELOW=10] [TOL_ABOVE=5]
+#==============================================================================
+[gcode_macro PRINT_START]
+description: Start with hotend tolerance band so we begin when "close enough"
+gcode:
+    {% set bedtemp     = params.BED|int %}
+    {% set hotendtemp  = params.HOTEND|int %}
+    {% set tol_below   = (params.TOL_BELOW|default(10))|int %}  # how far below target is OK
+    {% set tol_above   = (params.TOL_ABOVE|default(5))|int  %}  # how far above target is OK
+    {% set min_ok      = hotendtemp - tol_below %}
+    {% set max_ok      = hotendtemp + tol_above %}
+    {% if min_ok < 0 %}{% set min_ok = 0 %}{% endif %}
 
-# ... heat non-blocking, home, lift, etc. ...
+    _SET_FLAP_ENABLED ENABLED=1
+    lights_max
+    M220 S100                      ; reset speed multiplier
+    G90                            ; absolute positioning
 
-# Bed: only wait if below (optionally allow a small below-target tolerance too)
-{% if printer.heater_bed.temperature < bedtemp - tol %}
-  TEMPERATURE_WAIT SENSOR=heater_bed MINIMUM={{ bedtemp - tol }}
-{% endif %}
+    ; Start preheating
+    M104 S155                      ; warm extruder to reduce ooze during bed heat
+    M190 S{bedtemp}                ; set & wait for bed temp
 
-# Nozzle “smart wait” with tolerance:
-# 1) If already within [hotend - tol, hotend + tol] → don't wait
-# 2) If above by more than tol → (optional) wait down to hotend + tol
-# 3) If below by more than tol → heat & wait to hotend
-{% if printer.extruder.temperature > hotendtemp + tol %}
-  TEMPERATURE_WAIT SENSOR=extruder MAXIMUM={{ hotendtemp + tol }}
-{% elif printer.extruder.temperature < hotendtemp - tol %}
-  M109 S{hotendtemp}
-{% else %}
-  ; already within tolerance band → proceed
-{% endif %}
+    ; Home and move clear
+    G28
+    _CLIENT_LINEAR_MOVE Z=5 F=1500
 
-# Safety: make sure we're not under min_extrude_temp
-{% if printer.extruder.temperature < min_extrude %}
-  M109 S{min_extrude}
-{% endif %}
+    ; Re-affirm bed temp before print (optional)
+    M190 S{bedtemp}
+
+    ; Set hotend target, then wait within a tolerance band
+    SET_HEATER_TEMPERATURE HEATER=extruder TARGET={hotendtemp}
+    TEMPERATURE_WAIT SENSOR=extruder MINIMUM={min_ok} MAXIMUM={max_ok}
+
+    ; From here on we’re “close enough” to target; start your routines
+    ; NOZZLE_WIPE_LOCATION_READY
+    ; NOZZLE_WIPE
+    PRIME_LINE
