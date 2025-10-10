@@ -1,38 +1,31 @@
 #==============================================================================
-# Print Start G code
+# Print Start G-code (no cooldown wait if already hot)
 #==============================================================================
 [gcode_macro PRINT_START]
-gcode:        
-    #lights_max
-    #SET_LED LED="rgb" RED=1 GREEN=1 BLUE=1 SYNC=0 TRANSMIT=1
-    #status_heating
-    M220 S100 # reset speed multiplier
-    G90 ; test to see if this fixes out of range error
-    # Parameters
-    {% set bedtemp = params.BED|int %}
-    {% set hotendtemp = params.HOTEND|int %}
+gcode:
+    _SET_FLAP_ENABLED ENABLED=1
+    lights_max
+    M220 S100
+    G90
 
-    M104 S155 ; set extruder to 155deg
-    M190 S{bedtemp} ; set & wait for bed temp
-    #status_homing
-    G28 ; Home all axises
-    #G90 ; test to see if this fixes rhe issue
-    #status_meshing
-    BED_MESH_CALIBRATE ADAPTIVE=1
-    G1 Z5 F5000 ;lift
-    G1 X4 Y2 F5000 ; move to prime location
-    G1 Z0.4 F2500 ;lift
-    #status_busy
-    M109 S{hotendtemp}  ; set & wait for hotend temp
-    #status_off
-    #White
-    G1 E15 f600 ; prime nozzle
-    G1 Z0.2 F240 ; get ready to prime
-    G92 E0 ; reset extruder distance position
-    G1 X60.0 E9.0 F1000.0 ; intro line
-    G1 X100.0 E23.5 F1000.0 ; intro line
-    G92 E0 ;zero the extruded length again
-    G1 F9000
-    G0 Z2
-    G90  ; absolute positioning
-   
+    # Parameters (safe defaults if slicer doesn't pass them)
+    {% set bedtemp    = params.BED|default(60)|int %}
+    {% set hotendtemp = params.HOTEND|default(210)|int %}
+    {% set overshoot  = params.OVERSHOOT|default(8)|int %}  # allow up to +8°C above target
+
+    # Start heating WITHOUT blocking
+    M140 S{bedtemp}                 ; set bed (no wait)
+    M104 S{hotendtemp}              ; set hotend (no wait)
+
+    # Do motion/setup while heaters climb
+    G28                              ; home all axes
+    _CLIENT_LINEAR_MOVE Z=5 F=1500
+    ; BED_MESH_CALIBRATE ADAPTIVE=0  ; (optional)
+    ; NOZZLE_WIPE_LOCATION_READY     ; (optional)
+
+    # Wait logic that only blocks if below target (no wait if already hot)
+    TEMPERATURE_WAIT SENSOR=heater_bed MINIMUM={bedtemp}
+    TEMPERATURE_WAIT SENSOR=extruder MINIMUM={hotendtemp} MAXIMUM={{ hotendtemp + overshoot }}
+
+    ; NOZZLE_WIPE                    ; (optional)
+    PRIME_LINE
