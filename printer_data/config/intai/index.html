@@ -517,7 +517,88 @@
         }
 
         // --- Individual Copy Feature for Macros ---
-        function copyToolOffset(toolId, btnElement) {
+        // Clipboard API only works reliably on HTTPS/localhost secure contexts.
+        // Because this page is hosted from http://10.1.1.6:8090, we use a fallback too.
+        function fallbackCopyText(text) {
+            var textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.setAttribute("readonly", "");
+            textArea.style.position = "fixed";
+            textArea.style.top = "-1000px";
+            textArea.style.left = "-1000px";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+
+            var success = false;
+            try {
+                success = document.execCommand("copy");
+            } catch (err) {
+                console.error("Fallback copy failed.", err);
+                success = false;
+            }
+
+            document.body.removeChild(textArea);
+            return success;
+        }
+
+        function showManualCopyBox(text) {
+            var existing = document.getElementById("manualCopyBox");
+            if (existing) existing.remove();
+
+            var box = document.createElement("div");
+            box.id = "manualCopyBox";
+            box.style.position = "fixed";
+            box.style.left = "50%";
+            box.style.top = "50%";
+            box.style.transform = "translate(-50%, -50%)";
+            box.style.width = "420px";
+            box.style.maxWidth = "90vw";
+            box.style.background = "white";
+            box.style.border = "3px solid #3b82f6";
+            box.style.borderRadius = "14px";
+            box.style.boxShadow = "0 20px 50px rgba(0,0,0,0.25)";
+            box.style.zIndex = "9999";
+            box.style.padding = "18px";
+            box.style.textAlign = "left";
+
+            box.innerHTML = `
+                <div style="font-weight:900; font-size:18px; color:#0f172a; margin-bottom:8px;">Copy offsets manually</div>
+                <div style="font-size:13px; color:#475569; margin-bottom:10px;">Automatic clipboard copy was blocked by the browser. Select the text below and copy it.</div>
+                <textarea id="manualCopyText" style="width:100%; height:120px; font-family:monospace; font-size:14px; box-sizing:border-box; padding:10px;">${text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</textarea>
+                <div style="text-align:right; margin-top:12px;">
+                    <button class="btn-secondary" onclick="document.getElementById('manualCopyBox').remove()">Close</button>
+                </div>
+            `;
+
+            document.body.appendChild(box);
+            var ta = document.getElementById("manualCopyText");
+            ta.focus();
+            ta.select();
+        }
+
+        async function copyTextSmart(text) {
+            // Try the modern API first if available.
+            if (navigator.clipboard && window.isSecureContext) {
+                try {
+                    await navigator.clipboard.writeText(text);
+                    return true;
+                } catch (err) {
+                    console.warn("navigator.clipboard failed, trying fallback.", err);
+                }
+            }
+
+            // Try old-school copy fallback.
+            if (fallbackCopyText(text)) {
+                return true;
+            }
+
+            // Last resort: show a box the user can copy from.
+            showManualCopyBox(text);
+            return false;
+        }
+
+        async function copyToolOffset(toolId, btnElement) {
             var rx = document.getElementById("resX" + toolId).innerText;
             var ry = document.getElementById("resY" + toolId).innerText;
             var rz = document.getElementById("resZ" + toolId).innerText;
@@ -527,18 +608,35 @@
                 return;
             }
 
-            var output = `#T${toolId} Offsets\n`;
-            output += `variable_xoffset: ${rx !== "--" ? rx : "0.00"}\n`;
-            output += `variable_yoffset: ${ry !== "--" ? ry : "0.00"}\n`;
-            output += `variable_zoffset: ${rz !== "--" ? rz : "0.00"}\n`;
+            var output = `#T${toolId} Offsets
+`;
+            output += `variable_xoffset: ${rx !== "--" ? rx : "0.00"}
+`;
+            output += `variable_yoffset: ${ry !== "--" ? ry : "0.00"}
+`;
+            output += `variable_zoffset: ${rz !== "--" ? rz : "0.00"}
+`;
 
-            navigator.clipboard.writeText(output).then(function() {
-                var originalText = btnElement.innerText;
-                var originalBg = btnElement.style.background;
+            var originalText = btnElement.innerText;
+            var originalBg = btnElement.style.background;
+
+            var copied = await copyTextSmart(output);
+
+            if (copied) {
                 btnElement.innerText = "Copied!";
                 btnElement.style.background = "#10b981";
-                setTimeout(function() { btnElement.innerText = originalText; btnElement.style.background = originalBg; }, 2000);
-            });
+                setTimeout(function() {
+                    btnElement.innerText = originalText;
+                    btnElement.style.background = originalBg;
+                }, 2000);
+            } else {
+                btnElement.innerText = "Manual Copy";
+                btnElement.style.background = "#f59e0b";
+                setTimeout(function() {
+                    btnElement.innerText = originalText;
+                    btnElement.style.background = originalBg;
+                }, 2500);
+            }
         }
 
         // --- Camera Setup Code ---
