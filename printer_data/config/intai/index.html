@@ -1,0 +1,731 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Montserrat:400,600,800,900">
+    <title>intai - Calibration Tool</title>
+    <style> 
+        /* --- Global & Typography --- */
+        body { font-family: "Montserrat", sans-serif; text-align: center; background-color: #f1f5f9; color: #334155; margin: 0; padding: 30px 10px; } 
+        h1 { font-weight: 900; margin-bottom: 0px; color: #0f172a; font-size: 42px; letter-spacing: -1px; }
+        h3 { margin-top: 5px; color: #64748b; margin-bottom: 30px; font-weight: 600; font-size: 16px; }
+        
+        button { font-family: "Montserrat", sans-serif; text-align: center; cursor: pointer; transition: all 0.2s ease; border: none; border-radius: 6px; } 
+        button:disabled { background: #e2e8f0 !important; color: #94a3b8 !important; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
+        button:active:not(:disabled) { transform: scale(0.96); }
+
+        /* --- Panels --- */
+        .ui-panel { background: white; padding: 25px; display: inline-block; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); margin-bottom: 25px; vertical-align: top; width: 650px; text-align: left; box-sizing: border-box; }
+        .ui-panel-title { font-weight: 800; color: #0f172a; margin-top: 0; margin-bottom: 15px; font-size: 18px; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px;}
+        
+        /* Setup Panel */
+        .setup-panel { background: #1e293b; color: #f8fafc; padding: 20px; border-radius: 12px; margin-bottom: 25px; display: inline-block; box-shadow: 0 10px 20px rgba(15, 23, 42, 0.2); width: 650px; box-sizing: border-box; }
+        .setup-panel label { margin-left: 10px; font-size: 13px; font-weight: 600; color: #94a3b8; }
+        .setup-panel input[type="text"], .setup-panel select { padding: 8px 12px; font-size: 14px; border-radius: 6px; border: 1px solid #334155; text-align: center; margin: 5px; background: #0f172a; color: white; outline: none; transition: border 0.2s;}
+        .setup-panel input[type="text"]:focus, .setup-panel select:focus { border-color: #3b82f6; }
+        .setup-panel input[type="text"] { width: 120px; }
+        .setup-panel select { width: 130px; cursor: pointer; }
+        .setup-row { margin-bottom: 15px; display: flex; justify-content: center; align-items: center; flex-wrap: wrap; }
+        
+        input[type="checkbox"] { accent-color: #3b82f6; transform: scale(1.2); margin: 0; cursor: pointer; }
+
+        /* Video Container */
+        #videoContainer { position: relative; margin: 0 auto 20px auto; width: 640px; height: 480px; border: 6px solid #1e293b; overflow: hidden; background-color: #000000; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); } 
+        .stream-element { width: 100%; height: 100%; object-fit: contain; display: block; transform-origin: center; transition: transform 0.1s ease-out; } 
+        #crosshairOverlay { position: absolute; top: 50%; left: 50%; width: 120px; height: 120px; transform: translate(-50%, -50%); pointer-events: none; z-index: 100; }
+        .circle { position: absolute; width: 100%; height: 100%; border: 2px solid #ef4444; border-radius: 50%; box-sizing: border-box; box-shadow: 0 0 5px rgba(239, 68, 68, 0.5); }
+        .line-h { position: absolute; top: 50%; left: -20px; right: -20px; height: 2px; background: #ef4444; box-shadow: 0 0 5px rgba(239, 68, 68, 0.5); }
+        .line-v { position: absolute; left: 50%; top: -20px; bottom: -20px; width: 2px; background: #ef4444; box-shadow: 0 0 5px rgba(239, 68, 68, 0.5); }
+
+        /* General Buttons */
+        .btn-primary { background: #3b82f6; color: white; font-weight: 600; padding: 10px 18px; }
+        .btn-primary:hover { background: #2563eb; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3); }
+        .btn-secondary { background: #f1f5f9; color: #475569; padding: 10px 18px; font-weight: 600; border: 1px solid #e2e8f0; }
+        .btn-secondary:hover { background: #e2e8f0; }
+        .btn-success { background: #10b981; color: white; padding: 10px 18px; font-weight: 600; }
+        .btn-success:hover { background: #059669; box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3); }
+        .btn-danger { background: #ef4444; color: white; font-weight: 600; }
+        .btn-danger:hover { background: #dc2626; box-shadow: 0 4px 10px rgba(239, 68, 68, 0.3); }
+
+        /* Control Panel */
+        .control-panel-wrapper { background: #1e293b; border-radius: 12px; overflow: hidden; margin-bottom: 25px; box-shadow: 0 10px 20px rgba(15, 23, 42, 0.15); display: none; }
+        .control-header { background: #0f172a; color: white; text-align: center; padding: 12px 20px; font-weight: 800; border-bottom: 3px solid #3b82f6; letter-spacing: 1px; font-size: 14px; position: relative; }
+        .control-body { padding: 20px; display: flex; justify-content: space-around; align-items: stretch; }
+        
+        /* Info Button & Popup */
+        .info-btn { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); background: transparent; border: none; color: #94a3b8; font-size: 18px; cursor: pointer; padding: 0; transition: color 0.2s; }
+        .info-btn:hover { color: #38bdf8; }
+        .moonraker-popup { display: none; background: #0f172a; padding: 15px; font-size: 13px; color: #cbd5e1; border-bottom: 1px solid #1e293b; text-align: left; }
+        .moonraker-popup code { background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #38bdf8; font-family: monospace; }
+        .moonraker-popup pre { margin: 8px 0 0 0; background: #1e293b; padding: 10px; border-radius: 6px; color: #a78bfa; font-family: monospace; font-size: 12px; }
+
+        .jog-controls { display: flex; gap: 30px; align-items: center; }
+        .pad-xy { display: grid; grid-template-columns: 50px 50px 50px; grid-template-rows: 50px 50px 50px; gap: 6px; }
+        .pad-xy button { background: #334155; color: white; font-size: 18px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .pad-xy button:hover { background: #475569; }
+        .pad-xy button:active { background: #2196F3; transform: scale(0.95); }
+        .pad-xy .home-btn { background: #0f172a; font-size: 20px; color: #38bdf8; border: 1px solid #38bdf8;}
+        .pad-xy .home-btn:hover { background: #38bdf8; color: #0f172a; }
+        .pad-xy .empty { background: transparent; box-shadow: none; pointer-events: none; }
+
+        /* Z Pad neu mit Höhe = 78px damit es zu den 3 Reihen XY passt (50+50+50+6+6 = 162. 78+78+6 = 162) */
+        .pad-z { display: grid; grid-template-columns: 50px; grid-template-rows: 78px 78px; gap: 6px; }
+        .pad-z button { background: #334155; color: white; font-size: 16px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); font-weight: bold; }
+        .pad-z button:hover { background: #475569; }
+        .pad-z button:active { background: #2196F3; transform: scale(0.95); }
+
+        /* Step Selector 3x2 Grid */
+        .step-selector { display: flex; flex-direction: column; justify-content: center; border-left: 2px solid #334155; padding-left: 25px; }
+        .step-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; background: #0f172a; border-radius: 12px; padding: 8px; width: 140px; }
+        .step-btn { background: transparent; color: #94a3b8; padding: 8px 0; border-radius: 6px; font-weight: bold; font-size: 12px; border: none; cursor: pointer; transition: 0.2s;}
+        .step-btn:hover { background: #1e293b; color: #cbd5e1; }
+        .step-btn.active { background: #3b82f6; color: white; box-shadow: 0 2px 5px rgba(59, 130, 246, 0.4); }
+        
+        .tools-actions { display: flex; flex-direction: column; justify-content: space-between; border-left: 2px solid #334155; padding-left: 25px; min-width: 120px; }
+        .tool-pad { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-start; }
+        .tool-pad button { background: #334155; color: white; font-weight: bold; padding: 8px 12px; font-size: 12px; border-radius: 6px; }
+        .tool-pad button:hover { background: #10b981; color: white; box-shadow: 0 2px 5px rgba(16, 185, 129, 0.4); }
+        .estop-btn { background: #ef4444; color: white; font-weight: 800; font-size: 12px; padding: 12px; margin-top: 15px; border-radius: 8px; letter-spacing: 0.5px; }
+
+        /* Tables & Inputs */
+        input[type="number"] { width: 75px; padding: 8px; margin: 2px 4px; text-align: center; border: 1px solid #cbd5e1; border-radius: 6px; font-family: monospace; font-size: 14px; outline: none; transition: border 0.2s;}
+        input[type="number"]:focus { border-color: #3b82f6; }
+        .macro-inputs .tool-row { margin-bottom: 12px; font-weight: 600; display: flex; align-items: center; justify-content: flex-start; padding: 8px; background: #f8fafc; border-radius: 8px; border: 1px solid #f1f5f9; }
+        .btn-pos { font-size: 11px; padding: 6px 10px; margin-left: auto; background: #10b981; color: white; border-radius: 6px; font-weight: bold;}
+        .btn-pos:hover { background: #059669; }
+
+        .results-table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 10px; font-size: 14px; border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0; }
+        .results-table th, .results-table td { padding: 12px 10px; text-align: center; vertical-align: middle; border-bottom: 1px solid #e2e8f0; }
+        .results-table th { background-color: #f8fafc; font-weight: 700; color: #475569; }
+        .results-table tr:last-child td { border-bottom: none; }
+        .results-table td.result-val { font-weight: 700; color: #3b82f6; font-family: monospace; font-size: 15px; }
+        
+        .btn-copy { background: #3b82f6; color: white; padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 12px; margin: 0; }
+        .btn-copy:hover { background: #2563eb; }
+
+        /* UI History Panel */
+        .history-card { background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; margin-top: 15px; border-radius: 8px; text-align: left; }
+        .history-card .timestamp { font-size: 12px; color: #64748b; font-weight: 700; margin-bottom: 10px; display: block; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; }
+        .history-table { width: 100%; border-collapse: collapse; font-size: 13px; font-family: monospace;}
+        .history-table th, .history-table td { padding: 4px; text-align: center; }
+        .history-table th { color: #94a3b8; font-family: "Montserrat", sans-serif; font-size: 11px; text-transform: uppercase; }
+        
+        /* Step Box */
+        #textBox { font-size: 15px; border: 2px dashed #cbd5e1; min-height: 80px; margin: 0 0 20px 0; padding: 20px; background: #f8fafc; display: flex; align-items: center; justify-content: center; border-radius: 8px; color: #334155; line-height: 1.5; text-align: center; }
+    </style>
+</head>
+<body>
+
+    <h1>intai</h1>
+    <h3>Cam Based XYZ Calibration</h3>
+    
+    <div class="setup-panel">
+        <div class="setup-row">
+            <label for="connType">Connection:</label>
+            <select id="connType" onchange="toggleConnectionType()">
+                <option value="network">Network (IP)</option>
+                <option value="local">Local PC (USB)</option>
+            </select>
+            
+            <label for="toolCount">Tools:</label>
+            <select id="toolCount" onchange="buildInterface()">
+                <option value="2">2 (T0-T1)</option>
+                <option value="3">3 (T0-T2)</option>
+                <option value="4">4 (T0-T3)</option>
+                <option value="5">5 (T0-T4)</option>
+                <option value="6">6 (T0-T5)</option>
+                <option value="7">7 (T0-T6)</option>
+                <option value="8" selected>8 (T0-T7)</option>
+            </select>
+        </div>
+
+        <div class="setup-row" style="border-top: 1px solid #334155; padding-top: 15px; margin-top: 5px;">
+            <input type="checkbox" id="enableControlCheck" onchange="toggleControlPanel()">
+            <label for="enableControlCheck" style="margin-left: 8px; color: #38bdf8; cursor: pointer;">Enable Printer Control</label>
+            <span style="font-size:12px; color:#cbd5e1; margin-left:8px;">Tick this to show Home/Jog buttons</span>
+            
+            <label for="ipAddress" style="margin-left: 25px;">Printer IP:</label>
+            <input type="text" id="ipAddress" value="10.1.1.6" placeholder="10.1.1.6">
+            <button class="btn-success" type="button" onclick="testPrinterControl()" style="margin-left: 10px;">Test Control</button>
+        </div>
+
+        <div id="networkSetup" class="setup-row">
+            <label for="camSelect">Camera:</label>
+            <select id="camSelect" onchange="updateNetworkCamera()">
+                <option value="1">Cam 1</option>
+                <option value="2">Cam 2</option>
+                <option value="3">Cam 3</option>
+                <option value="4">Cam 4</option>
+            </select>
+            <button class="btn-primary" onClick="updateNetworkCamera()" style="margin-left: 10px;">Connect Cam</button>
+        </div>
+
+        <div id="localSetup" class="setup-row" style="display: none;">
+            <label for="localCamSelect">USB Camera:</label>
+            <select id="localCamSelect" onchange="startLocalCamera()"></select>
+            <button onClick="loadLocalCameras()" class="btn-primary" style="margin-left: 10px;">Refresh Cams</button>
+        </div>
+
+        <div id="camStatus" style="color: #94a3b8; margin-top: 5px; font-weight: 600; font-size: 14px;">Waiting for connection...</div>
+        <div id="controlStatus" style="color: #38bdf8; margin-top: 8px; font-weight: 700; font-size: 13px;">Printer control status: not tested yet.</div>
+    </div>
+
+    <div id="videoContainer">
+        <img id="videoStreamImg" class="stream-element" crossorigin="anonymous">
+        <video id="videoStreamVid" class="stream-element" autoplay playsinline style="display: none;"></video>
+        
+        <div id="crosshairOverlay">
+            <div class="circle"></div>
+            <div class="line-h"></div>
+            <div class="line-v"></div>
+        </div>
+    </div>
+
+    <div style="margin-bottom: 25px;">
+        <button class="btn-secondary" onClick="zoomIn()">Zoom In (+)</button> 
+        <button class="btn-secondary" onClick="zoomOut()">Zoom Out (-)</button>
+        <span style="margin: 0 15px; color: #cbd5e1;">|</span>
+        <label style="font-weight: 700; color: #475569; font-size: 14px; margin-right: 10px;">Brightness:</label> 
+        <input oninput="exposureHandler()" id="exposureSlider" type="range" min="0" max="20" value="10" style="vertical-align: middle;">
+    </div>
+
+    <div class="control-panel-wrapper" id="printerControlPanel" style="width: 650px; display: inline-block; text-align: left;">
+        <div class="control-header">
+            PRINTER CONTROL
+            <button class="info-btn" onclick="toggleInfo()" title="Moonraker Info">&#9432;</button>
+        </div>
+        
+        <div id="moonrakerInfo" class="moonraker-popup">
+            <strong>Important for Printer Control:</strong><br>
+            To allow intai to send API commands to your printer, add this to your <code>moonraker.conf</code>:
+            <pre>[authorization]<br>cors_domains:<br>    *://*</pre>
+        </div>
+
+        <div style="padding: 15px 20px 0 20px; text-align: center; background:#1e293b;">
+            <button class="btn-success" type="button" onclick="sendGcode('G28')" style="font-size:15px; padding:12px 22px; margin-right:10px;">HOME ALL / G28</button>
+            <button class="btn-primary" type="button" onclick="testPrinterControl()" style="font-size:15px; padding:12px 22px;">TEST CONTROL</button>
+        </div>
+
+        <div class="control-body">
+            <div class="jog-controls">
+                <div class="pad-xy">
+                    <button class="empty"></button>
+                    <button onclick="sendJog('Y', 1)">&#9650;</button>
+                    <button class="empty"></button>
+                    <button onclick="sendJog('X', -1)">&#9664;</button>
+                    <button class="home-btn" onclick="sendGcode('G28')" title="Home All (G28)" style="font-size:11px; font-weight:900; line-height:1.1;">HOME<br>G28</button>
+                    <button onclick="sendJog('X', 1)">&#9654;</button>
+                    <button class="empty"></button>
+                    <button onclick="sendJog('Y', -1)">&#9660;</button>
+                    <button class="empty"></button>
+                </div>
+
+                <div class="pad-z">
+                    <button onclick="sendJog('Z', 1)">Z&#9650;</button>
+                    <button onclick="sendJog('Z', -1)">Z&#9660;</button>
+                </div>
+            </div>
+
+            <div class="step-selector">
+                <div style="font-size: 11px; font-weight: 700; color: #94a3b8; margin-bottom: 5px; text-transform: uppercase;">Step Size (mm)</div>
+                <div class="step-row">
+                    <button class="step-btn" onclick="setStep(0.01, this)">0.01</button>
+                    <button class="step-btn" onclick="setStep(0.05, this)">0.05</button>
+                    <button class="step-btn" onclick="setStep(0.1, this)">0.1</button>
+                    <button class="step-btn active" onclick="setStep(1, this)">1</button>
+                    <button class="step-btn" onclick="setStep(10, this)">10</button>
+                    <button class="step-btn" onclick="setStep(50, this)">50</button>
+                </div>
+            </div>
+
+            <div class="tools-actions">
+                <div style="font-size: 11px; font-weight: 700; color: #94a3b8; margin-bottom: 5px; text-transform: uppercase;">Toolchanger</div>
+                <div class="tool-pad" id="toolButtonsContainer">
+                    </div>
+                <button class="estop-btn" onclick="emergencyStop()">EMERGENCY STOP</button>
+            </div>
+        </div>
+    </div><br>
+
+    <div class="ui-panel">
+        <div class="ui-panel-title">Calibration Wizard</div>
+        
+        <p id="textBox">Ready to start.</p>
+
+        <div style="margin-bottom: 25px; text-align: center;">
+            <button id="startButton" class="btn-primary" onClick="startHandler()">Start Step-by-Step Guide</button>
+            <button id="backButton" class="btn-secondary" style="margin: 0 10px;" onClick="backHandler()" disabled>Back</button>
+            <button id="resetButton" class="btn-secondary" onClick="resetHandler()" disabled>Reset Guide</button>
+        </div>
+
+        <div class="ui-panel-title" style="font-size: 14px; margin-bottom: 10px; border:none;">Absolute Positions</div>
+        <form id="calcForm" class="macro-inputs"></form>
+
+        <hr style="margin: 30px 0; border: 0; border-top: 1px solid #e2e8f0;">
+        
+        <div class="ui-panel-title" style="font-size: 16px; border:none;">Calculated Offsets (Tx - T0)</div>
+        <table class="results-table">
+            <thead>
+                <tr>
+                    <th>Tool</th>
+                    <th>X Offset</th>
+                    <th>Y Offset</th>
+                    <th>Z Offset</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="resultsTableBody"></tbody>
+        </table>
+        
+        <div style="margin-top: 20px;">
+            <button class="btn-success" style="width: 100%; padding: 12px; font-size: 15px;" onClick="saveToHistory()">Save All to History</button>
+        </div>
+    </div>
+
+    <div class="ui-panel" style="width: 380px; margin-left: 20px;">
+        <div class="ui-panel-title" style="display: flex; justify-content: space-between; align-items: center;">
+            Saved History
+            <button class="btn-secondary" style="padding: 4px 10px; font-size: 12px; color: #ef4444;" onClick="clearHistory()">Clear</button>
+        </div>
+        <div id="historyList">
+            <p style="color: #94a3b8; font-size: 14px; text-align: center; margin-top: 30px;">No saved offsets yet.</p>
+        </div>
+    </div>
+
+    <script>
+        let localStreamRef = null;
+        let currentJogStep = 1.0; 
+
+        // --- View Toggles ---
+        function toggleControlPanel() {
+            var isChecked = document.getElementById("enableControlCheck").checked;
+            document.getElementById("printerControlPanel").style.display = isChecked ? "inline-block" : "none";
+            localStorage.setItem("intaiControlEnabled", isChecked);
+        }
+
+        function toggleInfo() {
+            var info = document.getElementById("moonrakerInfo");
+            info.style.display = (info.style.display === "block") ? "none" : "block";
+        }
+
+        // --- Fluidd Control Logic ---
+        function setStep(value, btnElement) {
+            currentJogStep = value;
+            var buttons = document.querySelectorAll('.step-btn');
+            buttons.forEach(btn => btn.classList.remove('active'));
+            btnElement.classList.add('active');
+        }
+
+        function setControlStatus(message, ok) {
+            var el = document.getElementById("controlStatus");
+            if(!el) return;
+            el.style.color = ok ? "#10b981" : "#ef4444";
+            el.innerText = message;
+        }
+
+        function getPrinterHost() {
+            var ip = document.getElementById("ipAddress").value.trim();
+            if(!ip) return null;
+
+            // Accept any of these:
+            // 10.1.1.6
+            // 10.1.1.6:7125
+            // http://10.1.1.6:7125
+            ip = ip.replace(/^https?:\/\//, '').split('/')[0];
+
+            // Moonraker API port
+            if(!ip.includes(":")) {
+                ip = ip + ":7125";
+            }
+
+            return ip;
+        }
+
+        function getMoonrakerBaseUrl() {
+            var host = getPrinterHost();
+            if(!host) return null;
+            return "http://" + host;
+        }
+
+        function getMoonrakerUrl() {
+            var base = getMoonrakerBaseUrl();
+            if(!base) return null;
+            return base + "/printer/gcode/script";
+        }
+
+        async function sendGcode(command) {
+            var url = getMoonrakerUrl();
+            if(!url) {
+                alert("Please enter a Printer IP first.");
+                setControlStatus("Printer control failed: no IP entered.", false);
+                return;
+            }
+
+            setControlStatus("Sending: " + command.replace(/\n/g, " / "), true);
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ script: command })
+                });
+
+                const text = await response.text();
+                let body = text;
+                try { body = JSON.parse(text); } catch(e) {}
+
+                if(!response.ok) {
+                    console.error("Moonraker rejected command:", command, response.status, body);
+                    setControlStatus("Moonraker rejected command: HTTP " + response.status + " - check Mainsail console.", false);
+                    alert("Moonraker rejected command. HTTP " + response.status + "\n\n" + text);
+                    return;
+                }
+
+                console.log("Moonraker command OK:", command, body);
+                setControlStatus("Command sent OK: " + command.replace(/\n/g, " / "), true);
+            } catch(err) {
+                console.error("Failed to send Gcode.", err);
+                setControlStatus("Failed to send G-code. Check browser console/CORS.", false);
+                alert("Failed to send G-code. Check that this page is opened from http://localhost:8080 and Moonraker CORS is configured.");
+            }
+        }
+
+        function testPrinterControl() {
+            sendGcode('RESPOND TYPE=command MSG="Intai browser control test worked"');
+        }
+
+        function sendJog(axis, direction) {
+            var distance = (currentJogStep * direction).toFixed(2);
+            var command = `G91\nG1 ${axis}${distance} F3000\nG90`;
+            sendGcode(command);
+        }
+
+        async function emergencyStop() {
+            if(!confirm("TRIGGER EMERGENCY STOP?")) return;
+
+            var base = getMoonrakerBaseUrl();
+            if(!base) {
+                alert("Please enter a Printer IP first.");
+                return;
+            }
+
+            try {
+                const response = await fetch(base + "/printer/emergency_stop", { method: 'POST' });
+                if(response.ok) {
+                    setControlStatus("Emergency stop sent OK.", true);
+                } else {
+                    setControlStatus("Emergency stop rejected: HTTP " + response.status, false);
+                }
+            } catch(err) {
+                console.error("Emergency stop failed.", err);
+                setControlStatus("Emergency stop failed.", false);
+            }
+        }
+
+        async function recordPosition(toolIndex) {
+            var base = getMoonrakerBaseUrl();
+            if(!base) {
+                alert("Enter IP to fetch position.");
+                setControlStatus("Could not fetch position: no IP entered.", false);
+                return;
+            }
+
+            try {
+                const res = await fetch(base + "/printer/objects/query?gcode_move");
+                const data = await res.json();
+
+                if(!res.ok || !data.result || !data.result.status || !data.result.status.gcode_move) {
+                    console.error("Bad position response:", data);
+                    throw new Error("Moonraker response did not include gcode_move position.");
+                }
+
+                var pos = data.result.status.gcode_move.gcode_position;
+                document.getElementById("x" + toolIndex).value = pos[0].toFixed(2);
+                document.getElementById("y" + toolIndex).value = pos[1].toFixed(2);
+                document.getElementById("z" + toolIndex).value = pos[2].toFixed(2);
+                calculateOffsets();
+                setControlStatus("Position recorded for T" + toolIndex + ": X" + pos[0].toFixed(2) + " Y" + pos[1].toFixed(2) + " Z" + pos[2].toFixed(2), true);
+            } catch(err) {
+                console.error("Could not fetch position.", err);
+                setControlStatus("Could not fetch position. Check Moonraker/CORS.", false);
+                alert("Could not fetch position. Ensure Klipper is connected, Moonraker is on port 7125, and CORS is configured.");
+            }
+        }
+
+        // --- Dynamic UI Builder ---
+        function buildInterface() {
+            var count = parseInt(document.getElementById("toolCount").value);
+            localStorage.setItem("klipperToolCount", count);
+
+            var tempVals = {};
+            for(var i=0; i<8; i++) {
+                var elX = document.getElementById("x"+i);
+                if(elX) tempVals[i] = { x: elX.value, y: document.getElementById("y"+i).value, z: document.getElementById("z"+i).value };
+            }
+
+            var formHtml = "";
+            var toolBtnsHtml = "";
+            for(var i=0; i<count; i++) {
+                var vx = tempVals[i] ? tempVals[i].x : "";
+                var vy = tempVals[i] ? tempVals[i].y : "";
+                var vz = tempVals[i] ? tempVals[i].z : "";
+                
+                formHtml += `<div class="tool-row"><span style="width: 30px; display:inline-block; color:#475569;">T${i}:</span> 
+                    <span style="color:#94a3b8; font-size:12px;">X</span> <input type="number" id="x${i}" step="0.01" value="${vx}" oninput="calculateOffsets()"> 
+                    <span style="color:#94a3b8; font-size:12px;">Y</span> <input type="number" id="y${i}" step="0.01" value="${vy}" oninput="calculateOffsets()"> 
+                    <span style="color:#94a3b8; font-size:12px;">Z</span> <input type="number" id="z${i}" step="0.01" value="${vz}" oninput="calculateOffsets()">
+                    <button type="button" class="btn-pos" onclick="recordPosition(${i})">Get Pos</button>
+                    </div>`;
+
+                toolBtnsHtml += `<button onclick="sendGcode('T${i}')">T${i}</button>`;
+            }
+            document.getElementById("calcForm").innerHTML = formHtml;
+            document.getElementById("toolButtonsContainer").innerHTML = toolBtnsHtml;
+
+            var tableHtml = "";
+            for(var i=1; i<count; i++) {
+                tableHtml += `
+                    <tr>
+                        <td style="color:#475569; font-weight:bold;">T${i}</td>
+                        <td class="result-val" id="resX${i}">--</td>
+                        <td class="result-val" id="resY${i}">--</td>
+                        <td class="result-val" id="resZ${i}">--</td>
+                        <td><button class="btn-copy" onclick="copyToolOffset(${i}, this)">Copy T${i}</button></td>
+                    </tr>`;
+            }
+            document.getElementById("resultsTableBody").innerHTML = tableHtml;
+
+            calculateOffsets();
+        }
+
+        // --- Offset Calculation (Tx - T0) ---
+        function calculateOffsets() {
+            var count = parseInt(document.getElementById("toolCount").value);
+            var x0 = document.getElementById("x0").value;
+            var y0 = document.getElementById("y0").value;
+            var z0 = document.getElementById("z0").value;
+
+            for (var i = 1; i < count; i++) {
+                var xi = document.getElementById("x" + i).value;
+                var yi = document.getElementById("y" + i).value;
+                var zi = document.getElementById("z" + i).value;
+
+                document.getElementById("resX" + i).innerText = (x0 !== "" && xi !== "") ? (parseFloat(xi) - parseFloat(x0)).toFixed(2) : "--";
+                document.getElementById("resY" + i).innerText = (y0 !== "" && yi !== "") ? (parseFloat(yi) - parseFloat(y0)).toFixed(2) : "--";
+                document.getElementById("resZ" + i).innerText = (z0 !== "" && zi !== "") ? (parseFloat(zi) - parseFloat(z0)).toFixed(2) : "--";
+            }
+        }
+
+        // --- Individual Copy Feature for Macros ---
+        function copyToolOffset(toolId, btnElement) {
+            var rx = document.getElementById("resX" + toolId).innerText;
+            var ry = document.getElementById("resY" + toolId).innerText;
+            var rz = document.getElementById("resZ" + toolId).innerText;
+
+            if (rx === "--" && ry === "--" && rz === "--") {
+                alert("No data to copy for T" + toolId + "!");
+                return;
+            }
+
+            var output = `#T${toolId} Offsets\n`;
+            output += `variable_xoffset: ${rx !== "--" ? rx : "0.00"}\n`;
+            output += `variable_yoffset: ${ry !== "--" ? ry : "0.00"}\n`;
+            output += `variable_zoffset: ${rz !== "--" ? rz : "0.00"}\n`;
+
+            navigator.clipboard.writeText(output).then(function() {
+                var originalText = btnElement.innerText;
+                var originalBg = btnElement.style.background;
+                btnElement.innerText = "Copied!";
+                btnElement.style.background = "#10b981";
+                setTimeout(function() { btnElement.innerText = originalText; btnElement.style.background = originalBg; }, 2000);
+            });
+        }
+
+        // --- Camera Setup Code ---
+        function toggleConnectionType() {
+            var type = document.getElementById("connType").value;
+            localStorage.setItem("klipperConnType", type);
+            
+            if (type === "network") {
+                document.getElementById("networkSetup").style.display = "flex";
+                document.getElementById("localSetup").style.display = "none";
+                document.getElementById("videoStreamVid").style.display = "none";
+                document.getElementById("videoStreamImg").style.display = "block";
+                
+                if(localStreamRef) { localStreamRef.getTracks().forEach(track => track.stop()); localStreamRef = null; }
+                updateNetworkCamera();
+            } else {
+                document.getElementById("networkSetup").style.display = "none";
+                document.getElementById("localSetup").style.display = "flex";
+                document.getElementById("videoStreamImg").style.display = "none";
+                document.getElementById("videoStreamVid").style.display = "block";
+                
+                document.getElementById("videoStreamImg").src = ""; 
+                loadLocalCameras();
+            }
+            resetZoomAndExposure();
+        }
+
+        function updateNetworkCamera() {
+            var rawIp = document.getElementById("ipAddress").value.trim();
+            var camId = parseInt(document.getElementById("camSelect").value);
+            var ip = rawIp.replace(/^https?:\/\//, '').split('/')[0];
+            document.getElementById("ipAddress").value = ip;
+            if(ip === "") return;
+
+            localStorage.setItem('klipperCamIP', ip);
+            localStorage.setItem('klipperCamIndex', camId);
+            
+            var proxyPath = (camId === 1) ? "/webcam/" : "/webcam" + camId + "/";
+            var directPort = 8080 + (camId - 1); 
+            var img = document.getElementById("videoStreamImg");
+            
+            img.onload = function() { document.getElementById("camStatus").innerHTML = "<span style='color:#10b981'>Connected!</span>"; };
+            img.onerror = function() { img.onerror = null; img.src = "http://" + ip + ":" + directPort + "/?action=stream"; };
+            img.src = "http://" + ip + proxyPath + "?action=stream";
+        }
+
+        async function loadLocalCameras() {
+            try {
+                await navigator.mediaDevices.getUserMedia({video: true});
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+                const camSelect = document.getElementById("localCamSelect");
+                camSelect.innerHTML = ""; 
+                
+                videoDevices.forEach((device, index) => {
+                    let option = document.createElement("option");
+                    option.value = device.deviceId;
+                    option.text = device.label || `Camera ${index + 1}`;
+                    camSelect.appendChild(option);
+                });
+                startLocalCamera(); 
+            } catch (err) { console.error("Local camera error", err); }
+        }
+
+        async function startLocalCamera() {
+            var deviceId = document.getElementById("localCamSelect").value;
+            var videoEl = document.getElementById("videoStreamVid");
+            if (localStreamRef) localStreamRef.getTracks().forEach(track => track.stop());
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: deviceId ? { exact: deviceId } : undefined, width: { ideal: 1920 }, height: { ideal: 1080 } } });
+                localStreamRef = stream;
+                videoEl.srcObject = stream;
+                document.getElementById("camStatus").innerHTML = "<span style='color:#10b981'>USB Camera connected!</span>";
+            } catch(e) { console.error(e); }
+        }
+
+        window.onload = function() {
+            var savedConnType = localStorage.getItem('klipperConnType');
+            var savedIP = localStorage.getItem('klipperCamIP');
+            var savedCam = localStorage.getItem('klipperCamIndex');
+            var savedTools = localStorage.getItem('klipperToolCount');
+            var savedControl = localStorage.getItem('intaiControlEnabled') === 'true';
+            
+            if (savedConnType) document.getElementById("connType").value = savedConnType;
+            if (savedCam) document.getElementById("camSelect").value = savedCam;
+            if (savedTools) document.getElementById("toolCount").value = savedTools;
+            if (savedIP) document.getElementById("ipAddress").value = savedIP;
+            if (!document.getElementById("ipAddress").value.trim()) document.getElementById("ipAddress").value = "10.1.1.6"; 
+            document.getElementById("enableControlCheck").checked = savedControl;
+            
+            buildInterface();
+            toggleConnectionType();
+            toggleControlPanel();
+            renderHistory();
+        };
+
+        // --- Zoom & Exposure ---
+        var currentZoomValue = 1;
+        function resetZoomAndExposure() { currentZoomValue = 1; applyStreamStyle(); }
+        function zoomIn() { if (currentZoomValue < 5) { currentZoomValue += 0.5; applyStreamStyle(); } }
+        function zoomOut() { if (currentZoomValue > 1) { currentZoomValue -= 0.5; applyStreamStyle(); } }
+        function exposureHandler() { applyStreamStyle(); }
+
+        function applyStreamStyle() {
+            var filterVal = "brightness(" + (document.getElementById("exposureSlider").value / 10.0) + ")";
+            var transformVal = "scale(" + currentZoomValue + ")";
+            var elements = document.querySelectorAll('.stream-element');
+            elements.forEach(el => { el.style.transform = transformVal; el.style.filter = filterVal; });
+        }
+
+        // --- History Logic ---
+        function saveToHistory() {
+            var count = parseInt(document.getElementById("toolCount").value);
+            var entry = { timestamp: new Date().toLocaleString(), tools: {} };
+            var hasData = false;
+
+            for(var i = 1; i < count; i++) {
+                var rx = document.getElementById("resX" + i).innerText;
+                var ry = document.getElementById("resY" + i).innerText;
+                var rz = document.getElementById("resZ" + i).innerText;
+
+                if(rx !== "--" || ry !== "--" || rz !== "--") {
+                    entry.tools["T" + i] = { x: rx, y: ry, z: rz };
+                    hasData = true;
+                }
+            }
+
+            if(!hasData) { alert("No calculated offsets to save."); return; }
+            var history = JSON.parse(localStorage.getItem("klipperCalHistory") || "[]");
+            history.unshift(entry); 
+            if(history.length > 10) history.pop(); 
+            localStorage.setItem("klipperCalHistory", JSON.stringify(history));
+            renderHistory();
+        }
+
+        function renderHistory() {
+            var history = JSON.parse(localStorage.getItem("klipperCalHistory") || "[]");
+            var container = document.getElementById("historyList");
+            if(history.length === 0) { container.innerHTML = "<p style='color:#94a3b8; font-size: 14px; text-align:center; margin-top:30px;'>No saved offsets yet.</p>"; return; }
+            
+            var html = "";
+            history.forEach(function(item) {
+                html += "<div class='history-card'><span class='timestamp'>" + item.timestamp + "</span>";
+                html += "<table class='history-table'><tr><th>Tool</th><th>X</th><th>Y</th><th>Z</th></tr>";
+                for(var t in item.tools) { html += "<tr><td>" + t + "</td><td>" + item.tools[t].x + "</td><td>" + item.tools[t].y + "</td><td>" + item.tools[t].z + "</td></tr>"; }
+                html += "</table></div>";
+            });
+            container.innerHTML = html;
+        }
+
+        function clearHistory() { if(confirm("Clear history?")) { localStorage.removeItem("klipperCalHistory"); renderHistory(); } }
+
+        // --- Step Wizard Logic ---
+        var currentState = 0;
+
+        function startHandler() {
+            if (currentState === 0) { document.getElementById("backButton").disabled = false; document.getElementById("resetButton").disabled = false; document.getElementById("startButton").innerHTML = "Next Step"; }
+            currentState++; stateHandler();
+        }
+
+        function backHandler() { if(currentState > 0) { currentState--; stateHandler(); } }
+        function resetHandler() { location.reload(); }
+
+        function stateHandler() {
+            var count = parseInt(document.getElementById("toolCount").value) - 1;
+            var box = document.getElementById("textBox");
+            
+            var steps = [
+                "Ready to start.",
+                "<strong>Step 1:</strong> Home the printer using the Home (&#127968;) button in the Printer Control Panel.",
+                "<strong>Step 2:</strong> Pick up T0 and place it in the center of the crosshair. Adjust Z height until it touches the bed or probe.",
+                "<strong>Step 3:</strong> Record the position for T0 (Use the green 'Get Pos' button).",
+                "<strong>Step 4:</strong> Put away T0 and pick up T1 (You can use the T-Buttons).",
+                "<strong>Step 5:</strong> Move T1 until it is centered in the crosshair and touches the Z-probe/bed.",
+                "<strong>Step 6:</strong> Record the position for T1.",
+                "<strong>Step 7:</strong> Repeat for all remaining tools (up to T" + count + ").",
+                "<strong>DONE!</strong> Use the blue 'Copy' buttons in the table to copy the offsets into your macros."
+            ];
+            
+            if(currentState >= 8) {
+                box.innerHTML = steps[8];
+                document.getElementById("startButton").disabled = true;
+            } else {
+                box.innerHTML = steps[currentState];
+            }
+        }
+    </script>
+</body>
+</html>
